@@ -1,166 +1,183 @@
-# Battery Guard — Complete Setup Guide
+# Battery Guard — Enterprise Deployment & Operations Guide
 
-> Cross-platform battery monitor with Telegram phone notifications.
-> Works on **Windows 10/11** and **Ubuntu Linux 20.04+**
+This document provides technical instructions for deploying, configuring, and operating Battery Guard across Linux (Ubuntu 20.04+) and Windows workstation environments.
 
 ---
 
 ## Table of Contents
 
-1. [Install Python](#1-install-python)
-2. [Install Dependencies](#2-install-dependencies)
-3. [Create a Telegram Bot](#3-create-a-telegram-bot)
-4. [Run the App](#4-run-the-app)
-5. [Auto-Start on Boot](#5-auto-start-on-boot)
-6. [Troubleshooting](#6-troubleshooting)
+1. [Architecture & Prerequisites](#1-architecture--prerequisites)
+2. [System Dependency Installation](#2-system-dependency-installation)
+3. [Python Environment Setup](#3-python-environment-setup)
+4. [Notification Channel Configuration](#4-notification-channel-configuration)
+5. [Hardware Diagnostics & Compliance Export](#5-hardware-diagnostics--compliance-export)
+6. [Service Execution & Deployment Modes](#6-service-execution--deployment-modes)
+7. [Automated Boot Persistence](#7-automated-boot-persistence)
+8. [Operational Troubleshooting](#8-operational-troubleshooting)
 
 ---
 
-## 1. Install Python
+## 1. Architecture & Prerequisites
 
-### Windows
+Battery Guard is designed as a modular hardware monitoring daemon. It requires access to ACPI power supply sysfs interfaces on Linux (`/sys/class/power_supply/`) or Windows battery sensor APIs via `psutil`.
 
-1. Download Python 3.10+ from [python.org/downloads](https://www.python.org/downloads/)
-2. **Check** "Add Python to PATH" during install
-3. Verify:
-   ```
-   python --version
-   ```
+### Minimum Hardware & OS Requirements
+- **Linux:** Ubuntu 20.04 LTS or newer (or Debian 11+ equivalent)
+- **Windows:** Windows 10 (64-bit) or Windows 11
+- **Python:** Runtime version 3.10 or later
+- **Hardware:** Laptop battery or Desktop uninterruptible power supply (UPS) with ACPI telemetry bindings
 
-### Ubuntu Linux
+---
 
+## 2. System Dependency Installation
+
+Before setting up the Python environment, install required OS-level packages for GUI rendering, speech synthesis, desktop notifications, and power management.
+
+### Ubuntu Linux (Debian/APT)
 ```bash
 sudo apt update
-sudo apt install python3 python3-pip python3-venv python3-tk -y
-python3 --version
+sudo apt install python3 python3-pip python3-venv python3-tk libnotify-bin speech-dispatcher power-profiles-daemon -y
 ```
 
-> [!IMPORTANT]
-> On Ubuntu, `python3-tk` is required for the GUI. Install it with `sudo apt install python3-tk`.
+### Windows
+Ensure Python 3.10+ is installed from python.org with the **Add Python to PATH** option checked during installation.
 
 ---
 
-## 2. Install Dependencies
+## 3. Python Environment Setup
 
-Navigate to the project folder and install:
+Navigate to the workspace root and initialize an isolated virtual environment to prevent dependency conflicts with system packages.
 
+### Linux
 ```bash
 cd /path/to/hp_charge
+python3 -m venv venv
+source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-On Ubuntu, if `pip` installs to a different location:
-```bash
-pip3 install -r requirements.txt
-```
-
-### What Gets Installed
-
-| Package | Purpose |
-|---|---|
-| `psutil` | Read battery status |
-| `customtkinter` | Modern dark-themed UI |
-| `pystray` | System tray icon |
-| `Pillow` | Tray icon image generation |
-| `requests` | Telegram API calls |
-
----
-
-## 3. Create a Telegram Bot
-
-This enables **phone notifications** with vibration & sound.
-
-### Step 1: Create the Bot
-
-1. Open Telegram on your phone
-2. Search for **@BotFather** and start a chat
-3. Send: `/newbot`
-4. Enter a name: `Battery Guard`
-5. Enter a username: `YourName_BatteryGuard_bot` (must end with `bot`)
-6. BotFather will reply with your **Bot Token** — copy it!
-
-   Example: `7123456789:AAF1x2y3z4a5b6c7d8e9f0`
-
-### Step 2: Get Your Chat ID
-
-1. Search for **@userinfobot** on Telegram and start a chat
-2. Send: `/start`
-3. It will reply with your **Chat ID** (a number like `123456789`)
-
-### Step 3: Activate the Bot
-
-1. Go to your new bot's chat (search its username)
-2. Press **Start** — this allows the bot to send you messages
-
-### Step 4: Enter Credentials in Battery Guard
-
-- On first launch, the Setup Wizard will ask for the Token and Chat ID
-- You can also enter them later via **Settings (⚙)**
-- Click **Test Notification** to verify it works
-
----
-
-## 4. Run the App
-
 ### Windows
-```
-python battery_guard.py
+```powershell
+cd C:\path\to\hp_charge
+python -m venv venv
+venv\Scripts\activate
+pip install -r requirements.txt
 ```
 
-### Ubuntu Linux
+### Package Architecture
+| Library | Purpose |
+| :--- | :--- |
+| `psutil` | Polling system power states, battery percentages, and AC line status |
+| `customtkinter` | Rendering high-DPI dark-themed graphical interfaces |
+| `pystray` | Managing persistent system tray indicators and AppIndicator bindings |
+| `Pillow` | Dynamically generating tray icon bitmaps based on charge levels |
+| `requests` | Executing HTTP POST/GET requests for webhooks, Telegram, Green API, and CallMeBot |
+| `plyer` | Interfacing with native OS notification daemons (DBus / Win32) |
+
+---
+
+## 4. Notification Channel Configuration
+
+Battery Guard supports multi-channel notification dispatching with zero polling overhead or background RAM footprint when disabled.
+
+### Option A: Push Notifications via ntfy (Recommended for Mobile)
+1. Install the **ntfy** client application on iOS or Android.
+2. Subscribe to a secure, unique topic string (e.g., `corp-workstation-8841-alerts`).
+3. In Battery Guard, navigate to **Settings** and input the topic string under **ntfy Topic**.
+4. Select **Send Test ntfy Alert** to verify end-to-end delivery.
+
+### Option B: Enterprise Webhooks (Slack, Teams, Discord)
+1. Generate an Incoming Webhook URL from your corporate messaging platform or DevOps monitoring pipeline.
+2. In Battery Guard **Settings**, paste the endpoint into the **Enterprise Webhook URL** field.
+3. When alerts trigger, Battery Guard transmits structured JSON payloads containing severity level, battery percentage, and UTC timestamps.
+
+### Option C: WhatsApp Dispatching via Green API (Recommended) or CallMeBot
+#### Method 1: Green API (Free Tier, Instant Setup, No Third-Party Waiting)
+1. Register an account at [green-api.com](https://green-api.com/).
+2. From your dashboard, copy your instant **Instance ID** (a number like `1101823456`) and **API Token**.
+3. Scan the displayed QR code using WhatsApp on your phone (**Settings → Linked Devices → Link a Device**).
+4. In Battery Guard **Settings**, input your WhatsApp phone number in international format (e.g., `919876543210`) and enter your credentials in the API Key field formatted as: `instanceId/apiToken` (e.g., `1101823456/d75b3a66374942...`).
+
+#### Method 2: CallMeBot (Legacy Fallback)
+1. Add `+34 644 59 71 30` to your mobile contacts.
+2. Send the message `I allow callmebot to send me messages` via WhatsApp to receive an alphanumeric API Key.
+3. In Battery Guard **Settings**, input your phone number and the alphanumeric API Key.
+4. *Multi-Recipient Support:* Input comma-separated phone numbers and corresponding keys to dispatch alerts to multiple administrators simultaneously.
+
+### Option D: Telegram Bot API
+1. Initiate a conversation with `@BotFather` on Telegram and execute `/newbot` to generate a Bot Token.
+2. Query `@userinfobot` to retrieve your personal or group **Chat ID**.
+3. Input both values into the setup wizard or **Settings** panel and select **Test Notification**.
+
+---
+
+## 5. Hardware Diagnostics & Compliance Export
+
+Battery Guard interfaces directly with kernel sysfs endpoints to monitor battery wear and thermal stress.
+
+### Telemetry Inspection
+Open the primary dashboard and select **Analytics** to view:
+- **Battery Health:** Actual capacity relative to factory design specifications.
+- **Charge Cycles:** Total full charge/discharge cycles logged by the hardware controller.
+- **Thermal Temperature:** Live ACPI/CPU thermal readings (`/sys/class/thermal/`), enabling proactive mitigation of thermal degradation.
+
+### Compliance Audit Logging & CSV Export
+All threshold violations and charging state transitions are appended to an immutable JSON-lines log at `~/.battery_guard/audit.jsonl`. 
+
+To generate an executive compliance report for asset tracking or hardware warranty validation:
+1. Open the **Analytics** dialog.
+2. Select **Export CSV**.
+3. A formatted spreadsheet will be generated at `~/Desktop/Battery_Guard_Enterprise_Report.csv`.
+
+---
+
+## 6. Service Execution & Deployment Modes
+
+### Graphical Desktop Mode (GUI)
+Launches the interactive monitoring interface and system tray indicator.
+
+#### Linux
 ```bash
 python3 battery_guard.py
 ```
 
-### What you'll see:
-- Dark dashboard with a circular battery gauge
-- Live battery %, charging status, and time estimate
-- System tray icon showing battery %
-- On first launch: a setup wizard for Telegram
+#### Windows
+```powershell
+python battery_guard.py
+```
+
+### Headless Daemon Mode (Server / Remote)
+Designed for remote Linux servers, SSH workstations, or UPS-backed systems lacking a graphical desktop. Runs silently as a background process:
+```bash
+python3 battery_guard.py --daemon
+```
 
 ---
 
-## 5. Auto-Start on Boot
+## 7. Automated Boot Persistence
 
-### Option A: Use the Built-in Toggle
+### Option A: Built-in Application Preference
+1. Open **Settings** within the GUI.
+2. Check **Run on system startup** and select **Save**.
+   - *Windows:* Writes a startup string to Registry `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`.
+   - *Linux:* Generates a XDG autostart desktop entry at `~/.config/autostart/battery-guard.desktop`.
 
-1. Open Battery Guard → click **⚙ Settings**
-2. Enable **🚀 Run on system startup**
-3. Click **Save**
-
-This automatically registers the app:
-- **Windows**: Adds to Registry `HKCU\...\Run`
-- **Linux**: Creates `~/.config/autostart/battery-guard.desktop`
-
-### Option B: Manual Setup
-
-#### Windows — Task Scheduler
-
-1. Press `Win + R` → type `taskschd.msc`
-2. Click **Create Basic Task**
-3. Name: `Battery Guard`
-4. Trigger: **When I log on**
-5. Action: **Start a program**
-6. Program: `pythonw`
-7. Arguments: `"C:\path\to\battery_guard.py"`
-8. Finish
-
-#### Ubuntu — Systemd User Service
+### Option B: Linux Systemd User Service (For Headless/Daemon Mode)
+To run Battery Guard as an automated background systemd service:
 
 ```bash
 mkdir -p ~/.config/systemd/user
 
 cat > ~/.config/systemd/user/battery-guard.service << 'EOF'
 [Unit]
-Description=Battery Guard Monitor
-After=graphical-session.target
+Description=Battery Guard Daemon Service
+After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/python3 /path/to/battery_guard.py
+ExecStart=/usr/bin/python3 /path/to/hp_charge/battery_guard.py --daemon
 Restart=on-failure
-RestartSec=5
-Environment=DISPLAY=:0
+RestartSec=10
 
 [Install]
 WantedBy=default.target
@@ -171,52 +188,20 @@ systemctl --user enable battery-guard.service
 systemctl --user start battery-guard.service
 ```
 
-Replace `/path/to/battery_guard.py` with the actual path.
+*Note:* Replace `/path/to/hp_charge/` with the absolute path to your repository installation.
 
 ---
 
-## 6. Troubleshooting
+## 8. Operational Troubleshooting
 
-### "No battery detected"
-- You're running on a desktop PC without a battery
-- The app requires a laptop battery to function
-
-### Tray icon not showing (Ubuntu)
-Install the GNOME tray extension:
-```bash
-sudo apt install gnome-shell-extension-appindicator -y
-```
-Then log out and back in.
-
-### No sound on Ubuntu
-```bash
-sudo apt install pulseaudio-utils alsa-utils -y
-```
-
-### Telegram test fails
-- Double-check the Bot Token and Chat ID
-- Make sure you pressed **Start** in the bot's chat
-- Check your internet connection
-
-### GUI looks small on HiDPI
-Set scaling before running:
-```bash
-export GDK_SCALE=2
-python3 battery_guard.py
-```
+| Symptom | Root Cause | Remediation |
+| :--- | :--- | :--- |
+| `No battery detected` CLI error | Missing ACPI kernel bindings or desktop hardware | Verify kernel modules via `ls /sys/class/power_supply/`. |
+| Missing system tray icon | Desktop environment lacks AppIndicator support | On GNOME, install `gnome-shell-extension-appindicator` and re-login. |
+| Audible speech synthesis fails | Speech Dispatcher daemon not running | Execute `sudo apt install speech-dispatcher alsa-utils -y`. |
+| Interface scaling issues on HiDPI | GTK/Tkinter scaling factor mismatch | Export environment variable before launch: `export GDK_SCALE=2`. |
+| Webhook delivery timeouts | Network firewall blocking outbound HTTP POST | Verify outbound connectivity on port 443 via `curl -I <webhook_url>`. |
 
 ---
 
-## Quick Reference
-
-| Action | How |
-|---|---|
-| Open settings | Click ⚙ in top bar |
-| Minimize to tray | Close the window (X button) |
-| Open from tray | Right-click tray icon → Open App |
-| Test alerts | Right-click tray icon → Test Notification |
-| Exit completely | Right-click tray icon → Exit |
-
----
-
-**Made with ❤ — Battery Guard v1.0**
+**Battery Guard Enterprise Deployment Guide — Version 1.0**

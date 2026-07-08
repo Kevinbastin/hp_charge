@@ -74,21 +74,21 @@ def enable_universal_mousewheel(window):
         canvas = None
         curr = widget
         while curr is not None:
-            if isinstance(curr, tk.Canvas) and hasattr(curr, "yview_scroll"):
+            if type(curr) is tk.Canvas and hasattr(curr, "yview_scroll"):
                 canvas = curr
                 break
             curr = getattr(curr, "master", None)
-        if canvas is None:
+
+        if canvas is None or canvas.yview() == (0.0, 1.0):
             try:
                 top = widget.winfo_toplevel()
-                for child in top.winfo_children():
-                    if hasattr(child, "_parent_canvas") and isinstance(child._parent_canvas, tk.Canvas):
-                        canvas = child._parent_canvas
+                stack = [top]
+                while stack:
+                    w = stack.pop()
+                    if type(w) is tk.Canvas and hasattr(w, "yview_scroll") and w.yview() != (0.0, 1.0):
+                        canvas = w
                         break
-                    for sub in child.winfo_children():
-                        if hasattr(sub, "_parent_canvas") and isinstance(sub._parent_canvas, tk.Canvas):
-                            canvas = sub._parent_canvas
-                            break
+                    stack.extend(w.winfo_children())
             except Exception:
                 pass
 

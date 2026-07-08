@@ -78,7 +78,20 @@ def enable_universal_mousewheel(window):
                 canvas = curr
                 break
             curr = getattr(curr, "master", None)
-            
+        if canvas is None:
+            try:
+                top = widget.winfo_toplevel()
+                for child in top.winfo_children():
+                    if hasattr(child, "_parent_canvas") and isinstance(child._parent_canvas, tk.Canvas):
+                        canvas = child._parent_canvas
+                        break
+                    for sub in child.winfo_children():
+                        if hasattr(sub, "_parent_canvas") and isinstance(sub._parent_canvas, tk.Canvas):
+                            canvas = sub._parent_canvas
+                            break
+            except Exception:
+                pass
+
         if canvas is None:
             return
 
@@ -1863,10 +1876,11 @@ class BatteryGuardApp(ctk.CTk):
     def _show_analytics(self):
         win = ctk.CTkToplevel(self)
         win.title("Battery Diagnostics")
-        win.geometry("440x520")
+        win.geometry("560x640")
         win.configure(fg_color=C["bg"])
         win.attributes("-topmost", True)
-        win.resizable(False, False)
+        win.resizable(True, True)
+        win.minsize(480, 480)
 
         ctk.CTkFrame(win, height=3, fg_color=C["blue"], corner_radius=0).pack(fill="x")
         ctk.CTkLabel(win, text="Battery Diagnostics", font=font_bold(16), text_color=C["text"]).pack(pady=(16, 10))
@@ -1878,9 +1892,9 @@ class BatteryGuardApp(ctk.CTk):
 
         def add_row(k, v):
             r = ctk.CTkFrame(card, fg_color="transparent")
-            r.pack(fill="x", padx=16, pady=5)
-            ctk.CTkLabel(r, text=k, font=font(12), text_color=C["text_dim"]).pack(side="left")
-            ctk.CTkLabel(r, text=v, font=font_bold(12), text_color=C["text"]).pack(side="right")
+            r.pack(fill="x", padx=12, pady=6)
+            ctk.CTkLabel(r, text=k, font=font(12), text_color=C["text_dim"], anchor="w").pack(side="left", anchor="n", pady=2)
+            ctk.CTkLabel(r, text=v, font=font_bold(12), text_color=C["text"], anchor="e", justify="right", wraplength=340).pack(side="right", anchor="n", pady=2)
 
         add_row("Health Status:", f"Normal ({diag.get('health', '100%')})")
         add_row("Design Capacity:", diag.get('capacity_design', 'N/A'))

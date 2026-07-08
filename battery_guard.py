@@ -1419,9 +1419,8 @@ class BatteryGuardApp(ctk.CTk):
         ctk.CTkFrame(self, height=1, fg_color=C["border"], corner_radius=0).pack(fill="x")
 
         # ── Main content area ──
-        main = ctk.CTkScrollableFrame(self, fg_color="transparent", scrollbar_button_color=C["bg_card"])
+        main = ctk.CTkFrame(self, fg_color="transparent")
         main.pack(fill="both", expand=True, padx=24, pady=16)
-        enable_universal_mousewheel(self)
 
         # ── Smart Alerts Toggle Banner ──
         sa_card = ctk.CTkFrame(main, fg_color=C["bg_card"], corner_radius=10,

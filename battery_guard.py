@@ -74,9 +74,13 @@ def enable_universal_mousewheel(window):
         canvas = None
         curr = widget
         while curr is not None:
+            if getattr(curr, "_is_gauge_canvas", False):
+                curr = getattr(curr, "master", None)
+                continue
             if type(curr) is tk.Canvas and hasattr(curr, "yview_scroll"):
-                canvas = curr
-                break
+                if hasattr(curr, "master") and (isinstance(curr.master, ctk.CTkScrollableFrame) or "scroll" in str(type(curr.master)).lower() or curr.yview() != (0.0, 1.0)):
+                    canvas = curr
+                    break
             curr = getattr(curr, "master", None)
 
         if canvas is None or canvas.yview() == (0.0, 1.0):
@@ -85,7 +89,7 @@ def enable_universal_mousewheel(window):
                 stack = [top]
                 while stack:
                     w = stack.pop()
-                    if type(w) is tk.Canvas and hasattr(w, "yview_scroll") and w.yview() != (0.0, 1.0):
+                    if type(w) is tk.Canvas and not getattr(w, "_is_gauge_canvas", False) and hasattr(w, "yview_scroll") and w.yview() != (0.0, 1.0):
                         canvas = w
                         break
                     stack.extend(w.winfo_children())
@@ -1432,8 +1436,9 @@ class BatteryGuardApp(ctk.CTk):
         ctk.CTkFrame(self, height=1, fg_color=C["border"], corner_radius=0).pack(fill="x")
 
         # ── Main content area ──
-        main = ctk.CTkFrame(self, fg_color="transparent")
+        main = ctk.CTkScrollableFrame(self, fg_color="transparent", scrollbar_button_color=C["bg_card"])
         main.pack(fill="both", expand=True, padx=24, pady=16)
+        enable_universal_mousewheel(self)
 
         # ── Smart Alerts Toggle Banner ──
         sa_card = ctk.CTkFrame(main, fg_color=C["bg_card"], corner_radius=10,
@@ -1466,6 +1471,7 @@ class BatteryGuardApp(ctk.CTk):
         canvas_size = self.gauge_size + 50
         self.canvas = tk.Canvas(gauge_container, width=canvas_size, height=canvas_size,
                                 bg=C["bg"], highlightthickness=0)
+        self.canvas._is_gauge_canvas = True
         self.canvas.pack()
         self._draw_gauge(0, C["green"])
 
